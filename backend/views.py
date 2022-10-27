@@ -7,20 +7,21 @@ from django.core.validators import URLValidator
 from django.db import IntegrityError
 from django.db.models import Q, Sum, F
 from django.http import JsonResponse
-from rest_framework import viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet
 from ujson import loads as load_json
+
+from .permissions import perm_for_shop
 from .tasks import *
 
 from backend.models import *
 from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer, \
-    OrderItemSerializer, OrderSerializer, ContactSerializer, ProductSerializer
+    OrderItemSerializer, OrderSerializer, ContactSerializer
 from backend.signals import *
+
 
 
 class LoginAccount(APIView):
@@ -283,7 +284,6 @@ class PartnerUpdate(APIView):
     """
 
     def post(self, request, *args, **kwargs):
-        print(request.data)
         if not request.user.is_authenticated:
             return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
 
@@ -343,13 +343,14 @@ class PartnerOrders(APIView):
     """
     Класс для получения заказов поставщиками
     """
+    permission_classes = [IsAuthenticated, perm_for_shop]
 
     def get(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
-
-        if request.user.type != 'shop':
-            return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
+        # if not request.user.is_authenticated:
+        #     return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+        #
+        # if request.user.type != 'shop':
+        #     return JsonResponse({'Status': False, 'Error': 'Только для магазинов'}, status=403)
 
         order = Order.objects.filter(
             ordered_items__product_info__shop__user_id=request.user.id).exclude(state='basket').prefetch_related(
@@ -437,11 +438,10 @@ class OrderView(APIView):
     """
     Класс для получения и размещения заказов пользователями
     """
+    permission_classes = [IsAuthenticated]
 
     # получить мои заказы
     def get(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return JsonResponse({'Status': False, 'Error': 'Пользователь не авторизован'}, status=403)
         order = Order.objects.filter(
             user_id=request.user.id).exclude(state='basket').prefetch_related(
             'ordered_items__product_info__product__category',
