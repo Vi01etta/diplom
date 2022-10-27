@@ -33,3 +33,4 @@ requests
 celery
 django-import-export
 redis
+pytest-django
